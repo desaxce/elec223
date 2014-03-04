@@ -1,0 +1,24 @@
+Je ne recopie pas le code de la slide 83, mais je l'ai compilé avec arm-none-eabi-gcc (-O0). Et l'objdump -s nous montre directement que la section .rodata contient deux fois notre Hello World!\n. Enfin, une fois exactement, l'autre ne contenant pas le '0a'. Pourquoi on l'a deux fois ?
+
+Toujours avec l'option -O0 (code asm + facile à lire), on désassemble le .o avec l'option -d d'objdump: on repère les deux 'branch & link' correspondant à nos deux affichages. Chose bizarre le premier fait appel à puts et pas à printf. On voit aussi qu'on met dans r0 la bonne constante située (dans mon cas) à l'adresse pc + 68. On regarde ce que vaut [pc+58], on trouve 0x10. Ok, on va sous gdb on lance le .o dans le simulateur, et on fait un x/10w 0x10, on trouve la chaine Hello World! stockée en little endian (contrairement au .o où c'était stocké en big endian).
+On n'a plus le retour à la ligne parce qu'il est déjà intégré dans la fonction puts. Sur internet on dit que puts est plus rapide (d'ailleurs on voit quand on désassemble le code sous gdb que puts correspond à l'adresse 0x80 qui je crois est une interruption donc ça doit être pour ça que c'est rapide). L'assembleur fait de l'optimisation dans le cas où il détecte un CRLF: mais au cas où il garde quand meme la vraie valeur de la constante à afficher (je suis pas sûr de comprendre pourquoi).
+
+Ce qui est sûr c'est que si on change le bout de code du hello world en enlevant le '\n', le compilateur ne fait plus cette optimisation (il ne peut pas). Quand on dump avec -d on a bien un 'bl printf'.
+
+Quand on compile avec l'option -Os, le seul changement c'est de l'économie de place, puisqu'il n'y a plus de padding avec des zéros. Et quand on compile avec -O1, la section .rodata se voit décomposée en .rodata qui contient la vraie constante (avec '\n') et une autre section .rodata.str1.4 qui contient 0x30 octets. De ce que j'ai compris, cette section est la seule qui sera réellement pris en compte par le linker. L'autre (.rodata) sera supprimée par le linker (c'est juste que le compilateur ne se permet pas de faire perdre de l'information sur la constante: on pourrait imaginer un cas où la fonction puts ne serait pas disponible et seule printf pourrait être utilisée). Mais la chaine de caractère utilisée avec l'optimisation -O1 correspond bien à celle sans le retour à la ligne (ça se voit sous gdb).
+Je pense quand meme que je passe a côté de l'intérêt de rodata.str1.4: ça reste un peu flou.
+
+Dans le cas où on privatise la constante, on remarque que dans le cas -O1, on n'a plus la section .rodata contenant la vraie chaine (avec '\n') (sans optimisation je ne vois pas de changements). Avec static on rend la variable privée. 
+Ok, en fait je viens de comprendre la différence avec le cas où ne mettait pas static. Tout à l'heure on avait deux sections séparées:
+.rodata qui contenait la vraie constante
+.rodata.str1.4 qui contenait la constante utilisée dans l'optimisation (ie sans le '0a')
+
+Il se trouve que si on dump avec -t et qu'on regarde les flags de ces deux sections, il n'y a que .rodata qui a le flag global (pour que le linker puisse exporter la variable si une autre unité de compilation en a besoin). Quand on utilise static on ne veut plus que mesg soit exportée donc ça ne sert à rien de créer une section globale et on a juste besoin de garder la constante utilisée dans l'optimisation (sans le CRLF).
+
+Question 4:
+J'ai donc changé le tableau en un pointeur. Je compile avec -O1. On peut remarquer que seule la section .rodata.str1.4 existe mais toujours en flag local (il n'y a pas .rodata). Mais ça ne veut pas dire pour autant que la constante n'est pas accessible dans une autre unité de compilation: en effet un dump -t montre qu'on a le symbole mesg dans la section .data (qui lui est bien global). Parfait dans ce cas, ça marchera bien lors du link. Mais la conclusion c'est qu'il vaut mieux quand meme utiliser un tableau plutot qu'un pointeur (quand on définit mesg)  puisque sinon le compilateur ne peut pas optimiser (en changeant printf en puts).
+
+Enfin, quand on remplace par 'const char * const mesg', j'ai vraiment l'impression que c'est moins bien que quand on utilise un tableau. C'est comme dans le cas précédent excepté qu'on ne stocke pas le pointeur dans .data mais dans .rodata. C'est vrai que comparé au cas où on utilisait simplement 'const char * mesg' c'est mieux parce qu'on a l'optimisation du compilateur printf -> puts. Mais c'est un peu idiot de devoir stocker deux fois la chaine Hello World! dans .rodata.str1.4 et en plus de devoir garder un pointeur global vers la chaine originale (avec \n) pour qu'elle soit dispo pour les autres unités de compilation lors du link. Comparé au 1er cas mesg[], on a rajouté une variable (le pointeur situé dans .rodata) sans qu'on voit un vrai avantage.
+
+J'ai pas testé mais qu'est-ce qui se passe si on met un static devant const char * mesg ? (c'est sans doute encore pire).
+

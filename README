@@ -1,0 +1,8 @@
+ELEC223
+
+exercices/		Plusieurs exos sur la compilation et les processeurs ARM
+hello.c			*
+Makefile		* TD cross-compilation
+script.ld		*
+crt0.s			*
+openocd.cfg		Configuration d'openocd

@@ -1,0 +1,41 @@
+Le bit-banding fait correspondre chaque bit d'un registre à une adresse mémoire (alias).
+Dès que le bit de poids faible à l'adresse mémoire correspondante est modifié, ça modifie aussi le bit qui lui est lié. De cette manière on peu modifié le bit directement via une instruction LDR.
+
+L'avantage de cette méthode est qu'on pourra modifié un bit d'un registre sans se faire interrompre par une interruption.
+
+J'ai enfin trouvé une sorte d'article qui explique bien le gain qu'apporte le bit-banding: spin.atomicobject.com/2013/02/08/bit-banding/:
+
+On comprend pourquoi on pourrait avoir besoin de ne modifier qu'un seul bit d'un registre et pourquoi cette tâche doit se faire en trois étapes dans une configuration classique.
+
+Questions: Le lien entre l'alias region et la bit-band region se fait au niveau hardware ou est-ce que c'est configurable?
+Quel est le principe d'un registre périphérique ? Les registres ne sont pas que dans le processeur ?
+
+
+
+
+By Jordan Schaenzle | Published: February 8, 2013
+
+
+I was recently working on an embedded project when the term Bit-banding came up. I had never heard this term before. I asked around to a handful of my coworkers, and they hadn’t heard of it either.
+
+
+The Problem with Read-Modify-Write
+
+Before I explain what Bit-Banding is, let me give a little bit of context. Typically a CPU core cannot write to individual bits of a register. Instead it must write entire bytes or even words at a time. If a CPU needs to change the value of a bit and can only write a byte at a time, it must first read the current value into a temporary register, modify that value with a logic operation, and then write the final result. This three step process is aptly named Read-Modify-Write.
+
+Using Read-Modify-Write operations to set bits works fine when you’re doing one thing at a time, but problems can arise when an application is doing multiple things concurrently. For example, what happens if an interrupt occurs between the read and modify operations that changes the value in the register? The new value will get overwritten. This race-condition could lead to undesired behavior.
+How Bit-banding Works
+
+Bit-banding is a term that ARM uses to describe a feature that is available on the Cortex M3 and M4 CPU cores. Basically, the device takes a region of memory (the Bit-band region) and maps each bit in that region to an entire word in a second memory region (the Bit-band Alias Region).
+
+The benefit of Bit-banding is that a write to a word in the alias region performs a write to the corresponding bit in the Bit-band region. Also, reading a word in the alias region will return the value of the corresponding bit in the Bit-band region. These operations take a single machine instruction thus eliminate race conditions. This is especially useful for interacting with peripheral registers where it is often necessary to set and clear individual bits.
+
+The image below shows a byte in the Bit-band region on the top. The bottom row of bytes represent the bit-band alias region. For demonstration purposes I choose to use 8-bit words. On the Cortex M3 and M4 the alias region would contain 32-bit words.
+
+(bon là faut aller sur le site pour voir l'image en question)
+
+To use this feature, you must first get the address of the word in the alias region that corresponds to the bit you wish to read/write. This is done in C with a simple pre-processor macro. For a detailed example of how to use this feature, check out the ARM InfoCenter page on bit-banding.
+
+This is not the only solution to this problem. All common architectures have implemented mechanisms for atomically setting and clearing bits. ARM’s approach is elegant in that it can be exercised with ANSI C, while most others implementations require special C extensions or the use of assembly language.
+
+

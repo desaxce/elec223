@@ -1,0 +1,28 @@
+On a un simple hello world:
+#include <stdio.h>
+
+int main() {
+	printf("Hello World!\n");
+	return 0;
+}
+
+
+qu'on compile (gcc -o -g hello hello.c) puis qu'on objdump avec l'option -h. On trouve l'ordre suivant:
+section	| vma
+text	| 0x400490
+rodata	| 0x400660
+data	| 0x601038
+bss	| 0x601048
+
+On peut remarquer que le hello.o intermédiaire ne contient pas les sections dans cet ordre là (le linker script par défaut doit les réordonner).
+
+Pour checker où est la pile je rajoute juste avant le printf les deux lignes suivantes:
+	int a = 123;
+	int b = 125;
+J'en mets 2 comme ça on saura dans quelle sens croît la pile. Je compile avec la ligne gcc -o -g hello hello.c. Je lance gdb sur hello, je mets un bpoint sur la 1ère ligne et je lance. Quand on arrive aux deux lignes ci-dessus, je les exécute et je regarde les adresses de a et b (qui sont sur la pile normalement). Je trouve &a=0x7fffffffde80 et &b= 0x7fffffffde84. Donc la pile a des adresses quasi-maximales (niveau poids) et elle grandit de plus en plus. Ca me semble un peu bizarre que la pile grandisse vers le bas parce que ça ne laisse pas beaucoup de place pour les variables locales...
+
+Idem pour le tas: on sait que ça concerne des malloc donc je rajoute la ligne suivant dans le main: int *c = malloc(sizeof(int)); Je compile, je débugge et je regarde où pointe c: on trouve 0x602010. Ok donc là on a des adresses super basses mais derrière le bss quand meme.
+
+On récapitule:
+en premier c'est le text, rodata, data, bss, puis vient le tas et pour terminer la pile (qui est complètement à l'autre bout).
+Ce qui est bizarre c'est que je pensais que la pile et le tas croissait tous les deux dans des sens opposés, mais là on ne dirait pas que c'est ce qui se passe.

@@ -1,0 +1,7 @@
+On change "uint32_t y" par uint8_t, uint16_t ou uint64_t et on recompile.
+Quand on lance objdump avec l'option -t, la colonne de gauche prend la taille (en octets) de y (comme la quatrième colonne en fait).
+
+Comme y n'est pas encore initialisé dans cette unité de compilation, on ne sait pas encore si y va aller dans la section .data (ça c'est le cas où le linker trouve une initialisation de y dans une autre unité de compilation) ou .bss (cas où y n'est pas initialisée). Du coup on a *COM* comme section dans l'objdump.
+
+Ca n'a pas de sens de parler d'adresse pour un objet dont on ne sait pas encore où il sera. Donc dans le cas de y, la colonne de gauche contiendra le type de y (sa taille).
+Mais alors pourquoi est-ce qu'on stocke aussi la taille de y dans la quatrième colonne ?

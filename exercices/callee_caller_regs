@@ -1,0 +1,9 @@
+http://infocenter.arm.com/help/topic/com.arm.doc.ihi0042e/IHI0042E_aapcs.pdf
+Au paragraphe 5.3.1.1 Use of IP by the linker.
+
+Apparemment le linker se permettrait de modifier la valeur du registre IP entre le caller et le callee. On est donc obligé de sauver la valeur d'IP avant d'appeler une fonction: IP caller saved.
+Pour LR ça me semble évident qu'on ne peut pas le sauver quand on a déjà fait un saut vers une adresse différente (comment peut on retrouver l'adresse de retour quand on est perdu ???): idem caller saved.
+
+Pour SP ce qui est sûr c'est qu'on est obligé de sauver sa valeur après LR (puisque LR est lui-même sauvé sur la pile). Par convention, SP est callee saved.
+
+Finalement tout n'est qu'une question de convention, pour être sûr que tout le monde fasse bien la même chose et qu'un type utilisant la fonction d'une autre personne n'ait pas à checker quels sont les registres déjà sauvegardés, etc...
